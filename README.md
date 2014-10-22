@@ -1,4 +1,4 @@
-MavLinkSerialToUDP
+MavLink Serial To UDP
 ==================
 
-This is to get MavLink data from my Pixhawk to my GCS via a Raspberry PI
+This is to send  MavLink data from a APM or Pixhawk to a GCS via a Raspberry PI using UDP.
