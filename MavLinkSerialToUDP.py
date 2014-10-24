@@ -101,7 +101,7 @@ def main():
         time.sleep(1)
         udp_write('hello')
         try:
-            udp_data, udp_client = udp_socket.recvfrom(1024)
+	    udp_data, udp_client = udp_socket.recvfrom(512)
             if udp_data is not None:
                 connection = True
                 print "GCS connection from: ", udp_client
