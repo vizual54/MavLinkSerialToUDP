@@ -43,14 +43,15 @@ THR_LOCK = threading.Lock()
 udp_port = int(udp_port)
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 udp_socket.bind(('0.0.0.0', udp_port))
+udp_socket.setblocking(0)
 baud_rate = int(baud_rate)
 py_serial    = None
 connection = False
 
 def open_port(portname, baudrate):
   try:
-    # Set timeouts to 4 ms. 3.5 ms is the measured bias when long msg get cut!
-    return serial.Serial(portname, baudrate, timeout=0.004, writeTimeout=0.004)
+    #return serial.Serial(portname, baudrate, timeout=0.004, writeTimeout=0.004)
+    return serial.Serial(portname, baudrate)
   except serial.SerialException as e:
     logging.debug("Could not open serial port: {}".format(portname, e))
     print ("Could not open serial port: {}".format(portname, e))
@@ -79,30 +80,46 @@ def udp_to_ser():                                                       # UDP to
             continue
 
         try:
-            udp_data, udp_client = udp_socket.recvfrom(1024)             # receive data on UDP
-            if udp_data is not None and connection is False:
-                connection = True
+            udp_data, udp_client = udp_socket.recvfrom(512)             # receive data on UDP
+##            if udp_data is not None and connection is False:
+##                connection = True
         except socket.timeout:
             logging.error("Write timeout on socket")
+        except:
+            pass
         else:
-            ser_write(udp_data)                                                                                     # write data to serial
+            ser_write(udp_data) # write data to serial
+            #print "send serial"
         time.sleep(0.001)
 			
 def ser_to_udp():														# Serial to UDP thread
     while py_serial is not None:
         if not py_serial.readable() or not py_serial.inWaiting() > 0:
             continue
-
+        msg = bytearray()
+        msg.append(0)
+        payload_length = bytearray()
+        payload_length.append(0)
         try:
             THR_LOCK.acquire()
-            ser_msg = py_serial.readline().strip()                           # Remove newline character '\n'
-            THR_LOCK.release()
+            msg[0] = py_serial.read(1)
+            if msg[0] == 254:
+                payload_length[0] = py_serial.read()
+                msg.append(payload_length[0])
+                payload = py_serial.read(payload_length[0] + 6)
+                
+                for x in payload:
+                    msg.append(x)
         except serial.SerialTimeoutException as e:
             logging.error("Read timeout on serial port")
         except serial.SerialException as e:
             logging.error("Read exception on serial port")
         else:
-            udp_write(ser_msg)                                                  # write to UDP
+            udp_write(msg)
+            #print "send udp"
+            #udp_write(ser_msg  # write to UDP
+        finally:
+            THR_LOCK.release()
         time.sleep(0.001)
 
 def connect_udp():
@@ -126,4 +143,8 @@ if py_serial is None:
 	print "Could not open serial port. Script exit."
 	sys.exit()
 print "Waiting on port: ", udp_port
-main()
+try:
+    main()
+except KeyboardInterrupt:
+    py_serial.close()
+    sys.exit(1)
