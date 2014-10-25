@@ -133,6 +133,8 @@ if __name__ == '__main__':
                 print "Write timeout on serial port"
             except serial.SerialException as e:
                 print "Write exception serial port"
+            finally:
+                py_serial.flushInput()
 
     # Set event to start threads
     connected.set()

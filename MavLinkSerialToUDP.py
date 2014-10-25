@@ -107,6 +107,8 @@ def main():
             pass
         else:
             ser_write(udp_data)
+            py_serial.flushInput()
+            
           
     while connection is True:
             ser_to_udp()
