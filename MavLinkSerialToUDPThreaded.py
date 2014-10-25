@@ -27,13 +27,8 @@ def serial_to_udp(connected, lock, py_serial, udp_socket, udp_client):
             lock.acquire()
             msg[0] = py_serial.read(1)
             if msg[0] == 254:
-                #payload_length[0] = py_serial.read()
-                #msg.append(payload_length[0])
-                #payload = py_serial.read(payload_length[0] + 6)
                 msg.append(py_serial.read())
                 msg += py_serial.read(msg[1] + 6)
-                #for x in payload:
-                #    msg.append(x)
         except serial.SerialTimeoutException as e:
             logging.error("Read timeout on serial port")
         except serial.SerialException as e:
@@ -62,7 +57,6 @@ def udp_to_serial(connected, lock, py_serial, udp_socket):
             except serial.SerialException as e:
                 print "Write exception serial port"
             finally:
-                py_serial.flushInput()
                 lock.release()
 
 def exit_gracefully(signal, frame):
@@ -71,8 +65,9 @@ def exit_gracefully(signal, frame):
 
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, exit_gracefully)
+    
     if ( len(sys.argv) == 1 ):
-        print "MavLink UDP Proxy by Nils Hogberg, 2014"
+        print "MavLink UDP Proxy | Nils Hogberg 2014"
         print "Syntax: " + sys.argv[0] + " serial_port baud_rate(=57600) udp_ip(= 127.0.0.1) udp_port(= 14550)"
         print "Example: " + sys.argv[0] + " /dev/ttyAMA0 57600 127.0.0.1 14550"
         quit()
@@ -108,6 +103,7 @@ if __name__ == '__main__':
     baud_rate = int(baud_rate)
     py_serial    = None
 
+    # Serial port
     py_serial = open_port(serial_port, baud_rate)
     if py_serial is None:
             print "Could not open serial port. Script exit."
@@ -116,7 +112,6 @@ if __name__ == '__main__':
     sertoudp = multiprocessing.Process(name='sertoudp', target=serial_to_udp, args=(connected, lock, py_serial, udp_socket, udp_client))
     udptoser = multiprocessing.Process(name='udptoser', target=udp_to_serial, args=(connected, lock, py_serial, udp_socket))
     
-    print "starting processes"
     sertoudp.start()
     udptoser.start()
 
@@ -138,13 +133,10 @@ if __name__ == '__main__':
                 print "Write timeout on serial port"
             except serial.SerialException as e:
                 print "Write exception serial port"
-            finally:
-                py_serial.flushInput()
 
-    print "setting event"
+    # Set event to start threads
     connected.set()
 
-    print "wait for processes to finish"
+    # Wait for processes to finish and then exit
     sertoudp.join()
     udptoser.join()
-    
