@@ -58,8 +58,6 @@ def ser_write(output):
         logging.error("Write timeout on serial port")
     except serial.SerialException as e:
         logging.error("Write exception serial port")
-    finally:
-        py_serial.flushInput()
 
 def udp_write(msg):
     bytes = udp_socket.sendto(msg, (udp_ip, udp_port))
