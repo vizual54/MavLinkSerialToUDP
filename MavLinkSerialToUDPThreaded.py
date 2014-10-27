@@ -7,6 +7,8 @@ import sys
 import os
 import time
 import signal
+from ByteQueue import Byte_Queue
+from collections import deque
 
 def open_port(portname, baudrate):
   try:
@@ -37,27 +39,108 @@ def serial_to_udp(connected, lock, py_serial, udp_socket, udp_client):
             bytes = udp_socket.sendto(msg, udp_client)
         finally:
             lock.release()
-
+            
 def udp_to_serial(connected, lock, py_serial, udp_socket):
     connected.wait()
+    
+    udp_socket.setblocking(1)
+    byte_queue = deque()
+    byte_queue.extend(udp_socket.recv(1024))
+    #print "byte_queue is: ", len(byte_queue)
     while py_serial.isOpen():
-        time.sleep(0.005)
-        try:
-            udp_data, udp_client = udp_socket.recvfrom(512)            	# receive data on UDP
-        except socket.timeout:
-            logging.error("Read timeout on socket")
-        except:
-            pass
-        else:
-            try:
-                lock.acquire()
-                bytes = py_serial.write(udp_data)
-            except serial.SerialTimeoutException as e:
-                print "Write timeout on serial port"
-            except serial.SerialException as e:
-                print "Write exception serial port"
-            finally:
-                lock.release()
+        message = bytearray()
+        payload_length = bytearray()
+        payload_length.append(0)
+        current = bytearray()
+        if len(byte_queue) == 0:
+            byte_queue.extend(udp_socket.recv(1024))
+        #print "byte_queue is: ", len(byte_queue)
+        current.append(byte_queue.popleft())
+        #print "current is of type: ", type(current)
+        while current[0] != 254:
+            if len(byte_queue) == 0:
+                byte_queue.extend(udp_socket.recv(1024))
+            current[0] = byte_queue.popleft()
+        #    print "current: ", current[0]
+        message.append(current[0])
+        payload_length[0] = byte_queue.popleft()
+        #print "payload_length: ", payload_length[0]
+        message.append(payload_length[0])
+        for x in range(0, int(payload_length[0]) + 6):
+            if len(byte_queue) == 0:
+                byte_queue.extend(udp_socket.recv(1024))
+            message.append(byte_queue.popleft())
+        lock.acquire()
+        bytes = py_serial.write(message)
+        lock.release()
+        #print "message sent"
+        #print "byte_queue is: ", len(byte_queue)
+        
+##        
+##
+##
+##                      
+##    byte_queue = Byte_Queue()
+##    reply = udp_socket.recv(256)
+##    for byte in reply:
+##        byte_queue.put(byte)
+##        
+##    while py_serial.isOpen():
+##        message = bytearray()                  
+##        current = byte_queue.get() # get first byte
+##        while current != 254:      # while not start byte 
+##            #print "Current: ", current
+##            if byte_queue.empty():   # if empty, get more data from socket
+##                print "bytequeue empty waiting for data"
+##                reply = udp_socket.recv(256)
+##                for byte in reply:   # and put it into queue
+##                    byte_queue.put(byte)
+##            current = byte_queue.get()
+##        #print "Current: ", current
+##        message.append(current) # append start byte
+##        payload_length = byte_queue.get() # get payload length
+##        message.append(payload_length) # append payload length
+##        #print "payload length: ", message[1]
+##        for x in range(0, int(payload_length) + 6):
+##            if byte_queue.empty():
+##                print "bytequeue empty waiting for data 2"
+##                reply = udp_socket.recv(256)
+##                for byte in reply:
+##                    byte_queue.put(byte)
+##            message.append(byte_queue.get())
+##        try:
+##            lock.acquire()
+##            #print "message sent"
+##            #for x in message:
+##            #    print x
+##            bytes = py_serial.write(message)
+##        except serial.SerialTimeoutException as e:
+##            print "Write timeout on serial port"
+##        except serial.SerialException as e:
+##            print "Write exception serial port"
+##        finally:
+##            lock.release()
+                        
+##def udp_to_serial(connected, lock, py_serial, udp_socket):
+##    connected.wait()
+##    while py_serial.isOpen():
+##        #time.sleep(0.005)
+##        try:
+##            udp_data, udp_client = udp_socket.recvfrom(512)            	# receive data on UDP
+##        except socket.timeout:
+##            logging.error("Read timeout on socket")
+##        except:
+##            pass
+##        else:
+##            try:
+##                lock.acquire()
+##                bytes = py_serial.write(udp_data)
+##            except serial.SerialTimeoutException as e:
+##                print "Write timeout on serial port"
+##            except serial.SerialException as e:
+##                print "Write exception serial port"
+##            finally:
+##                lock.release()
 
 def exit_gracefully(signal, frame):
     py_serial.close()
@@ -135,8 +218,12 @@ if __name__ == '__main__':
                 print "Write exception serial port"
             finally:
                 py_serial.flushInput()
-
+                packet = None
+                while packet is not None:
+                    packet = udp_socket.recv(512)
+    
     # Set event to start threads
+    print "setting event"
     connected.set()
 
     # Wait for processes to finish and then exit
