@@ -7,7 +7,6 @@ import sys
 import os
 import time
 import signal
-from ByteQueue import Byte_Queue
 from collections import deque
 
 def open_port(portname, baudrate):
