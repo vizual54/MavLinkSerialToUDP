@@ -45,7 +45,7 @@ def udp_to_serial(connected, lock, py_serial, udp_socket):
     udp_socket.setblocking(1)
     byte_queue = deque()
     byte_queue.extend(udp_socket.recv(1024))
-    #print "byte_queue is: ", len(byte_queue)
+
     while py_serial.isOpen():
         message = bytearray()
         payload_length = bytearray()
@@ -53,17 +53,15 @@ def udp_to_serial(connected, lock, py_serial, udp_socket):
         current = bytearray()
         if len(byte_queue) == 0:
             byte_queue.extend(udp_socket.recv(1024))
-        #print "byte_queue is: ", len(byte_queue)
+
         current.append(byte_queue.popleft())
-        #print "current is of type: ", type(current)
+
         while current[0] != 254:
             if len(byte_queue) == 0:
                 byte_queue.extend(udp_socket.recv(1024))
             current[0] = byte_queue.popleft()
-        #    print "current: ", current[0]
         message.append(current[0])
         payload_length[0] = byte_queue.popleft()
-        #print "payload_length: ", payload_length[0]
         message.append(payload_length[0])
         for x in range(0, int(payload_length[0]) + 6):
             if len(byte_queue) == 0:
@@ -72,8 +70,6 @@ def udp_to_serial(connected, lock, py_serial, udp_socket):
         lock.acquire()
         bytes = py_serial.write(message)
         lock.release()
-        #print "message sent"
-        #print "byte_queue is: ", len(byte_queue)
 
 def exit_gracefully(signal, frame):
     py_serial.close()
@@ -156,7 +152,6 @@ if __name__ == '__main__':
                     packet = udp_socket.recv(512)
     
     # Set event to start threads
-    print "setting event"
     connected.set()
 
     # Wait for processes to finish and then exit
